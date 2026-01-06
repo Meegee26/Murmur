@@ -4,6 +4,25 @@ import User from "../models/user.model.js";
 import { JWT_EXPIRES_IN, JWT_SECRET } from "../config/env.js";
 import { compareValue } from "../utils/bcrypt.js";
 
+export const checkAuth = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      const error = new Error("User not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const signUp = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
