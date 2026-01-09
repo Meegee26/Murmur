@@ -3,6 +3,7 @@ import { FeaturesCards } from "./sections/FeaturesCards.jsx";
 import { Hero } from "./sections/Hero.jsx";
 import { Header } from "./Header.jsx";
 import { Footer } from "./Footer.jsx";
+import { TechStack } from "./sections/TechStack.jsx";
 
 export function Landing() {
   return (
@@ -11,6 +12,7 @@ export function Landing() {
       <main>
         <Hero />
         <FeaturesCards />
+        <TechStack />
       </main>
       <Footer />
     </Box>
