@@ -1,9 +1,23 @@
 import mongoose from "mongoose";
-import { hashValue, compareValue } from "../utils/bcrypt.js";
+import { hashValue, compareValue } from "../utils/bcrypt.util.js";
+
+const capitalize = (val) => {
+  if (typeof val !== "string") return val;
+  return val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+};
 
 const userSchema = new mongoose.Schema(
   {
-    name: { type: String, required: [true, "Name is required"] },
+    firstName: {
+      type: String,
+      required: [true, "First name is required"],
+      set: capitalize,
+    },
+    lastName: {
+      type: String,
+      required: [true, "Last name is required"],
+      set: capitalize,
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -14,10 +28,14 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: function () {
+        return !this.googleId;
+      },
       minLength: 6,
     },
+    googleId: { type: String, unique: true, sparse: true },
     avatar: { type: String, default: null },
+    isDev: { type: Boolean, default: false },
   },
   {
     timestamps: true,

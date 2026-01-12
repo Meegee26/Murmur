@@ -13,7 +13,17 @@ export function AuthProvider({ children }) {
     checkAuth();
   }, []);
 
+  const addUserToAuthContext = (userData) => {
+    setUser(userData);
+  };
+
   const checkAuth = async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await api.checkAuth();
       if (response.success && response.data) {
@@ -33,6 +43,7 @@ export function AuthProvider({ children }) {
       if (response.success && response.data) {
         setUser(response.data);
       }
+      return response;
     } catch (error) {
       console.error("Sign in failed:", error);
       throw error;
@@ -45,6 +56,7 @@ export function AuthProvider({ children }) {
       if (response.success && response.data) {
         setUser(response.data);
       }
+      return response;
     } catch (error) {
       console.error("Sign up failed:", error);
       throw error;
@@ -64,6 +76,7 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     loading,
+    addUserToAuthContext,
     signIn,
     signUp,
     signOut,

@@ -1,8 +1,35 @@
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
-import { JWT_EXPIRES_IN, JWT_SECRET } from "../config/env.js";
-import { compareValue } from "../utils/bcrypt.js";
+import Otp from "../models/otp.model.js";
+import googleClient from "../config/google.js";
+import { GOOGLE_CLIENT_ID, JWT_EXPIRES_IN, JWT_SECRET } from "../config/env.js";
+import { compareValue } from "../utils/bcrypt.util.js";
+import { sendOtpEmail } from "../utils/mailer.util.js";
+
+export const requestOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(409).json({ message: "Email already in use" });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await Otp.findOneAndUpdate(
+      { email },
+      { otp, expiresAt: new Date(Date.now() + 10 * 60000) },
+      { upsert: true }
+    );
+
+    await sendOtpEmail(email, otp);
+
+    res.status(200).json({ success: true, message: "OTP sent to email" });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const checkAuth = async (req, res, next) => {
   try {
@@ -28,18 +55,31 @@ export const signUp = async (req, res, next) => {
   session.startTransaction();
 
   try {
-    const { name, email, password } = req.body;
+    const { firstName, lastName, email, password, otp } = req.body;
 
-    const existingUser = await User.findOne({ email });
+    const otpRecord = await Otp.findOne({ email });
+
+    if (!otpRecord || otpRecord.otp !== otp) {
+      const error = new Error("Invalid or expired verification code");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const existingUser = await User.findOne({ email }).session(session);
     if (existingUser) {
       const error = new Error("Email already in use");
       error.statusCode = 409;
       throw error;
     }
 
-    const newUsers = await User.create([{ name, email, password }], {
-      session,
-    });
+    const newUsers = await User.create(
+      [{ firstName, lastName, email, password }],
+      {
+        session,
+      }
+    );
+
+    await Otp.deleteOne({ email }).session(session);
 
     const token = jwt.sign({ userId: newUsers[0]._id }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
@@ -92,6 +132,56 @@ export const signIn = async (req, res, next) => {
         token,
         user,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const googleSignIn = async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const {
+      given_name: firstName,
+      family_name: lastName,
+      email,
+      picture,
+      sub: googleId,
+      picture: avatar,
+    } = ticket.getPayload();
+
+    let user = await User.findOne({ email });
+    if (user) {
+      if (!user.googleId) {
+        user.googleId = googleId;
+        if (!user.firstName) user.firstName = firstName;
+        if (!user.lastName) user.lastName = lastName;
+        if (!user.avatar) user.avatar = avatar;
+        await user.save();
+      }
+    } else {
+      user = await User.create({
+        firstName,
+        lastName,
+        email,
+        avatar: picture,
+        googleId,
+      });
+    }
+
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { token, user },
     });
   } catch (error) {
     next(error);

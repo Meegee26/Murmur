@@ -1,7 +1,7 @@
 import { Container, Group, Text, rem, Box, Image } from "@mantine/core";
 import { useWindowScroll } from "@mantine/hooks";
 import { ColorSchemeToggle } from "../../components/ColorSchemeToggle.jsx";
-import logoIcon from "../../assets/images/icon.png";
+import logoIcon from "/icon.png";
 
 export function Header() {
   const [scroll] = useWindowScroll();

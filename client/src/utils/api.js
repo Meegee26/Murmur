@@ -22,6 +22,11 @@ apiClient.interceptors.request.use(
 );
 
 export const api = {
+  requestOtp: async (email) => {
+    const response = await apiClient.post("/auth/request-otp", { email });
+    return response.data;
+  },
+
   signUp: async (credentials) => {
     const response = await apiClient.post("/auth/sign-up", credentials);
     if (response.data.data.token) {
@@ -32,6 +37,14 @@ export const api = {
 
   signIn: async (credentials) => {
     const response = await apiClient.post("/auth/sign-in", credentials);
+    if (response.data.data.token) {
+      localStorage.setItem("authToken", response.data.data.token);
+    }
+    return response.data;
+  },
+
+  googleSignIn: async (idToken) => {
+    const response = await apiClient.post("/auth/google", { idToken });
     if (response.data.data.token) {
       localStorage.setItem("authToken", response.data.data.token);
     }

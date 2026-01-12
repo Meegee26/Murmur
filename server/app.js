@@ -1,13 +1,21 @@
 import express from "express";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 
-import { NODE_ENV, PORT } from "./src/config/env.js";
+import { FRONTEND_URL, NODE_ENV, PORT } from "./src/config/env.js";
 import connectToDatabase from "./src/database/mongodb.js";
 import errorMiddleware from "./src/middlewares/error.middleware.js";
 import authRouter from "./src/routes/auth.routes.js";
 import userRouter from "./src/routes/user.routes.js";
 
 const app = express();
+
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+    credentials: true,
+  })
+);
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: false }));
