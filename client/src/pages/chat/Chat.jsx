@@ -654,7 +654,7 @@ export function Chat() {
               <IconMessageCircle2 size={40} />
             </ThemeIcon>
             <Title order={3} mb="xs">
-              Welcome to Chat
+              Welcome to Murmur!
             </Title>
             <Text c="dimmed" size="sm">
               Select a chat or start a new one to begin messaging

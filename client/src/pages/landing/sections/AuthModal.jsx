@@ -182,6 +182,9 @@ export function AuthModal({ opened, close }) {
             <Text size="sm" ta="center">
               Enter the 6-digit code sent to <b>{tempData?.email}</b>
             </Text>
+            <Text size="xs" c="dimmed" ta="center" mt={-8}>
+              Please check your spam folder if you don't see the email
+            </Text>
             <PinInput
               length={6}
               type="number"
