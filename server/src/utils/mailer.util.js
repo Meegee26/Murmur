@@ -1,6 +1,7 @@
 import transporter from "../config/nodemailer.js";
 
 export const sendOtpEmail = async (email, otp) => {
+  console.log("[MAILER] Starting email send to:", email);
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff;">
       <div style="text-align: center; margin-bottom: 30px;">
@@ -25,10 +26,24 @@ export const sendOtpEmail = async (email, otp) => {
     </div>
   `;
 
-  return await transporter.sendMail({
-    from: '"Murmur" <no-reply@murmur.dev>',
-    to: email,
-    subject: `Your Verification Code: ${otp}`,
-    html: htmlContent,
-  });
+  try {
+    console.log("[MAILER] Sending email via Gmail SMTP...");
+    const result = await transporter.sendMail({
+      from: '"Murmur" <murmur.app.verify@gmail.com>',
+      to: email,
+      subject: `Your Verification Code: ${otp}`,
+      html: htmlContent,
+    });
+    console.log(
+      "[MAILER] Email sent successfully. Message ID:",
+      result.messageId,
+    );
+    return result;
+  } catch (error) {
+    console.error("[MAILER] Failed to send email");
+    console.error("[MAILER] Error code:", error.code);
+    console.error("[MAILER] Error message:", error.message);
+    console.error("[MAILER] Full error:", error);
+    throw error;
+  }
 };

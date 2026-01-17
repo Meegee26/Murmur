@@ -9,24 +9,32 @@ import { sendOtpEmail } from "../utils/mailer.util.js";
 
 export const requestOtp = async (req, res, next) => {
   try {
+    console.log("[OTP] Request received");
     const { email } = req.body;
+    console.log("[OTP] Email:", email);
 
     const existingUser = await User.findOne({ email });
-    if (existingUser)
+    if (existingUser) {
+      console.log("[OTP] Email already in use:", email);
       return res.status(409).json({ message: "Email already in use" });
-
+    }
+    console.log("[OTP] Email available");
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+    console.log("[OTP] Generated OTP");
     await Otp.findOneAndUpdate(
       { email },
       { otp, expiresAt: new Date(Date.now() + 10 * 60000) },
-      { upsert: true }
+      { upsert: true },
     );
 
+    console.log("[OTP] Saved to database");
+    console.log("[OTP] Attempting to send email...");
     await sendOtpEmail(email, otp);
-
+    console.log("[OTP] Email sent successfully");
     res.status(200).json({ success: true, message: "OTP sent to email" });
   } catch (error) {
+    console.error("[OTP] Error occurred:", error.message);
+    console.error("[OTP] Error stack:", error.stack);
     next(error);
   }
 };
@@ -76,7 +84,7 @@ export const signUp = async (req, res, next) => {
       [{ firstName, lastName, email, password }],
       {
         session,
-      }
+      },
     );
 
     await Otp.deleteOne({ email }).session(session);

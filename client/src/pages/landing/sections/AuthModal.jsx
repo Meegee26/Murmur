@@ -227,15 +227,17 @@ export function AuthModal({ opened, close }) {
             </Tabs>
 
             <Stack>
-              <Group justify="center" grow>
+              <Box style={{ display: "flex", justifyContent: "center" }}>
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   text={activeTab === "login" ? "signin_with" : "signup_with"}
                   theme="filled_black"
                   shape="rectangular"
-                  width="100%"
+                  ux_mode="popup"
+                  prompt="select_account"
+                  width={375}
                 />
-              </Group>
+              </Box>
 
               <Divider
                 label="Or continue with email"

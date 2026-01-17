@@ -9,6 +9,7 @@ import errorMiddleware from "./src/middlewares/error.middleware.js";
 import authRouter from "./src/routes/auth.routes.js";
 import userRouter from "./src/routes/user.routes.js";
 import chatRouter from "./src/routes/chat.routes.js";
+import healthRouter from "./src/routes/health.routes.js";
 
 initializeSocket();
 
@@ -16,13 +17,14 @@ app.use(
   cors({
     origin: FRONTEND_URL,
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
+app.use("/health", healthRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/chats", chatRouter);
