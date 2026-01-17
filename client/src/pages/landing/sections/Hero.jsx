@@ -44,7 +44,7 @@ export function Hero() {
               <Title
                 order={1}
                 style={{
-                  fontSize: rem(54),
+                  fontSize: { base: rem(32), sm: rem(42), md: rem(54) },
                   fontWeight: 900,
                   lineHeight: 1.1,
                 }}
@@ -111,9 +111,9 @@ export function Hero() {
               shadow="xl"
               radius="lg"
               withBorder
-              p="xl"
+              p={{ base: "md", md: "xl" }}
               w="100%"
-              maw={440}
+              maw={{ base: 340, sm: 380, md: 440 }}
               bg="var(--mantine-color-body)"
               style={{
                 transform: "perspective(1000px) rotateY(-8deg) rotateX(4deg)",

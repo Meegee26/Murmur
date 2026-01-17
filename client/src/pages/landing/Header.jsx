@@ -39,7 +39,7 @@ export function Header() {
             <Image
               src={logoIcon}
               alt="Murmur Logo"
-              h={45}
+              h={{ base: 35, sm: 45 }}
               w="auto"
               style={{ display: "block" }}
             />
@@ -48,7 +48,7 @@ export function Header() {
               variant="gradient"
               gradient={{ from: "indigo.6", to: "grape.6" }}
               style={{
-                fontSize: rem(38),
+                fontSize: { base: rem(28), sm: rem(38) },
                 lineHeight: 1,
                 display: "flex",
                 alignItems: "center",

@@ -230,15 +230,27 @@ export function AuthModal({ opened, close }) {
             </Tabs>
 
             <Stack>
-              <Box style={{ display: "flex", justifyContent: "center" }}>
+              <Box
+                sx={() => ({
+                  display: "flex",
+                  justifyContent: "center",
+                  "& > div": {
+                    width: "100% !important",
+                    maxWidth: "375px",
+                    "& > div": {
+                      width: "100% !important",
+                    },
+                  },
+                })}
+              >
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   text={activeTab === "login" ? "signin_with" : "signup_with"}
                   theme="filled_black"
                   shape="rectangular"
                   ux_mode="popup"
-                  prompt="select_account"
-                  width={375}
+                  use_fedcm_for_prompt={false}
+                  size="large"
                 />
               </Box>
 
@@ -251,7 +263,7 @@ export function AuthModal({ opened, close }) {
               <form onSubmit={form.onSubmit(handleConfirmCredentials)}>
                 <Stack gap="md">
                   {activeTab === "register" && (
-                    <SimpleGrid cols={2}>
+                    <SimpleGrid cols={{ base: 1, sm: 2 }}>
                       <TextInput
                         required
                         label="First Name"

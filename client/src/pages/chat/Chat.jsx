@@ -24,7 +24,7 @@ import {
   useComputedColorScheme,
   Menu,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
+import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import {
   IconSearch,
   IconSend,
@@ -41,6 +41,7 @@ import {
   IconSettings,
   IconSun,
   IconMoon,
+  IconArrowLeft,
 } from "@tabler/icons-react";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { io } from "socket.io-client";
@@ -58,6 +59,7 @@ export function Chat() {
   const { user, signOut } = useAuth();
   const { chatId } = useParams();
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const { setColorScheme } = useMantineColorScheme();
   const colorScheme = useComputedColorScheme("light", {
@@ -151,6 +153,11 @@ export function Chat() {
     },
     [navigate, user?._id],
   );
+
+  const handleBackToChats = () => {
+    navigate("/chat");
+    setActiveChat(null);
+  };
 
   useEffect(() => {
     if (!socket.current) return;
@@ -404,482 +411,489 @@ export function Chat() {
     [activeChat, getChatMetadata],
   );
 
+  const showSidebar = !isMobile || !activeChat;
+  const showChat = !isMobile || activeChat;
+
   return (
     <Box
       h="100vh"
       w="100vw"
       style={{ display: "flex", overflow: "hidden", position: "fixed" }}
     >
-      <Box
-        w={{ base: 80, md: 360 }}
-        style={{
-          borderRight:
-            "1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))",
-          display: "flex",
-          flexDirection: "column",
-          backgroundColor:
-            "light-dark(var(--mantine-color-white), var(--mantine-color-dark-7))",
-        }}
-      >
-        <Box px="md" pt="md" pb="xs">
-          <Group justify="space-between" mb="lg">
-            <Text
-              fw={900}
-              size="xl"
-              variant="gradient"
-              gradient={{ from: "indigo.6", to: "violet.6" }}
-              visibleFrom="md"
-            >
-              Chats
-            </Text>
-            <Menu shadow="md" width={200} position="bottom-end" radius="md">
-              <Menu.Target>
-                <ActionIcon variant="subtle" color="gray" size="lg">
-                  <IconSettings size={22} />
-                </ActionIcon>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Label>Settings</Menu.Label>
-                <Menu.Item
-                  leftSection={
-                    colorScheme === "dark" ? (
-                      <IconSun size={16} />
-                    ) : (
-                      <IconMoon size={16} />
-                    )
-                  }
-                  onClick={() =>
-                    setColorScheme(colorScheme === "dark" ? "light" : "dark")
-                  }
+      {showSidebar && (
+        <Box
+          w={{ base: "100%", md: 360 }}
+          style={{
+            borderRight:
+              "1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))",
+            display: "flex",
+            flexDirection: "column",
+            backgroundColor:
+              "light-dark(var(--mantine-color-white), var(--mantine-color-dark-7))",
+          }}
+        >
+          <Box px="md" pt="md" pb="xs">
+            <Group justify="space-between" mb="lg">
+              <Group gap="xs" align="center">
+                <Image
+                  src="/images/icon.png"
+                  alt="Murmur"
+                  h={40}
+                  w="auto"
+                  style={{ display: "block" }}
+                />
+                <Text
+                  fw={900}
+                  size="xl"
+                  variant="gradient"
+                  gradient={{ from: "indigo.6", to: "violet.6" }}
                 >
-                  {colorScheme === "dark" ? "Light Mode" : "Dark Mode"}
-                </Menu.Item>
-
-                <Menu.Divider />
-
-                <Menu.Item
-                  color="red"
-                  leftSection={<IconLogout size={16} />}
-                  onClick={() => signOut()}
-                >
-                  Logout
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          </Group>
-
-          <Group gap="xs" visibleFrom="md">
-            <TextInput
-              placeholder="Search conversations..."
-              radius="xl"
-              style={{ flex: 1 }}
-              visibleFrom="md"
-              value={sidebarSearch}
-              onChange={(e) => setSidebarSearch(e.target.value)}
-              leftSection={<IconSearch size={16} />}
-            />
-            <ActionIcon
-              variant="light"
-              color="violet"
-              radius="xl"
-              size="lg"
-              onClick={open}
-            >
-              <IconPlus size={20} />
-            </ActionIcon>
-          </Group>
-        </Box>
-
-        <ScrollArea style={{ flex: 1 }} type="scroll">
-          {isLoadingChats ? (
-            <Center mt="xl">
-              <Loader size="sm" />
-            </Center>
-          ) : filteredChats.length === 0 ? (
-            <Stack align="center" mt="xl" gap="xs" c="dimmed" px="md">
-              <IconMessages size={32} opacity={0.5} />
-              <Text size="sm" ta="center">
-                No chats found.
-              </Text>
-            </Stack>
-          ) : (
-            <Stack gap={4} px="sm" pb="md">
-              {filteredChats.map((chat) => {
-                const meta = getChatMetadata(chat);
-                const isActive = activeChat?._id === chat._id;
-
-                const myLastRead = chat.lastRead
-                  ? chat.lastRead[user?._id]
-                  : null;
-
-                const isLastMessageFromOthers =
-                  chat.lastMessage &&
-                  chat.lastMessage.sender?._id !== user?._id;
-
-                const isUnread =
-                  !isActive &&
-                  isLastMessageFromOthers &&
-                  (!myLastRead ||
-                    new Date(chat.lastMessage.createdAt) >
-                      new Date(myLastRead));
-
-                return (
-                  <UnstyledButton
-                    key={chat._id}
-                    onClick={() => handleChatSelect(chat)}
-                    p="sm"
-                    style={{
-                      borderRadius: "var(--mantine-radius-lg)",
-                      backgroundColor: isActive
-                        ? "light-dark(var(--mantine-color-violet-0), var(--mantine-color-dark-5))"
-                        : "transparent",
-                    }}
-                  >
-                    <Group wrap="nowrap">
-                      <Indicator
-                        color={
-                          meta.status.toLowerCase() === "online"
-                            ? "green.5"
-                            : "gray.6"
-                        }
-                        disabled={chat.isGroup}
-                        size={16}
-                        offset={7}
-                        position="bottom-end"
-                        withBorder
-                      >
-                        <Avatar
-                          src={meta.avatar}
-                          radius="xl"
-                          size="lg"
-                          color="violet"
-                        >
-                          {meta.initials}
-                        </Avatar>
-                      </Indicator>
-                      <Box
-                        style={{ flex: 1, overflow: "hidden" }}
-                        visibleFrom="md"
-                      >
-                        <Group justify="space-between" wrap="nowrap" gap="xs">
-                          <Group
-                            gap={6}
-                            wrap="nowrap"
-                            style={{ flex: 1, minWidth: 0 }}
-                          >
-                            <Text
-                              fw={isUnread ? 900 : 500}
-                              size="sm"
-                              truncate
-                              c={
-                                isUnread
-                                  ? "light-dark(black, white)"
-                                  : "inherit"
-                              }
-                            >
-                              {meta.name}
-                            </Text>
-                            {meta.isDev && (
-                              <Badge
-                                size="xs"
-                                variant="gradient"
-                                gradient={{
-                                  from: "indigo.6",
-                                  to: "cyan.6",
-                                  deg: 45,
-                                }}
-                                styles={{
-                                  label: {
-                                    fontWeight: 800,
-                                    letterSpacing: "0.5px",
-                                  },
-                                }}
-                                tt="uppercase"
-                              >
-                                DEV
-                              </Badge>
-                            )}
-
-                            <Text
-                              size="xs"
-                              c="dimmed"
-                              style={{ whiteSpace: "nowrap" }}
-                            >
-                              {chat.lastMessage?.createdAt
-                                ? new Date(
-                                    chat.lastMessage.createdAt,
-                                  ).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                : chat.updatedAt &&
-                                  new Date(chat.updatedAt).toLocaleTimeString(
-                                    [],
-                                    { hour: "2-digit", minute: "2-digit" },
-                                  )}
-                            </Text>
-                          </Group>
-                        </Group>
-                        <Text
-                          size="xs"
-                          truncate
-                          fw={isUnread ? 700 : 400}
-                          c={isUnread ? "light-dark(black, white)" : "dimmed"}
-                        >
-                          {chat.lastMessage?.content || "New conversation"}
-                        </Text>
-                      </Box>
-                    </Group>
-                  </UnstyledButton>
-                );
-              })}
-            </Stack>
-          )}
-        </ScrollArea>
-      </Box>
-
-      <Box style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {!activeChat ? (
-          <Center
-            style={{ flex: 1, flexDirection: "column" }}
-            bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))"
-          >
-            <ThemeIcon
-              size={80}
-              radius="100%"
-              variant="light"
-              color="violet"
-              mb="md"
-            >
-              <IconMessageCircle2 size={40} />
-            </ThemeIcon>
-            <Title order={3} mb="xs">
-              Welcome to Murmur!
-            </Title>
-            <Text c="dimmed" size="sm">
-              Select a chat or start a new one to begin messaging
-            </Text>
-          </Center>
-        ) : (
-          <>
-            <Box
-              px="xl"
-              h={80}
-              style={{
-                borderBottom: "1px solid var(--mantine-color-gray-2)",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <Group justify="space-between" w="100%">
-                <Group>
-                  <Avatar
-                    src={activeChatMeta.avatar}
-                    radius="xl"
-                    color="violet"
-                  >
-                    {activeChatMeta.initials}
-                  </Avatar>
-                  <Box>
-                    <Group gap={10} align="center">
-                      <Text fw={800} size="md">
-                        {activeChatMeta.name}
-                      </Text>
-                      {activeChatMeta.isDev && (
-                        <Badge
-                          variant="gradient"
-                          gradient={{ from: "indigo.6", to: "cyan.6", deg: 45 }}
-                          size="xs"
-                        >
-                          DEVELOPER
-                        </Badge>
-                      )}
-                    </Group>
-                    <Text
-                      size="xs"
-                      fw={700}
-                      c={
-                        !activeChat.isGroup &&
-                        activeChatMeta.status.toLowerCase() === "online"
-                          ? "green"
-                          : "dimmed"
-                      }
-                      style={{ textTransform: "capitalize" }}
-                    >
-                      {activeChat.isGroup
-                        ? `${activeChat.participants.length} members`
-                        : activeChatMeta.status}
-                    </Text>
-                  </Box>
-                </Group>
-                {/* <Group gap="sm">
-                  <ActionIcon
-                    variant="light"
-                    radius="xl"
-                    color="gray"
-                    size="lg"
-                  >
-                    <IconPhone size={20} />
-                  </ActionIcon>
-                  <ActionIcon
-                    variant="light"
-                    radius="xl"
-                    color="gray"
-                    size="lg"
-                  >
-                    <IconVideo size={20} />
-                  </ActionIcon>
-                  <ActionIcon
-                    variant="light"
-                    radius="xl"
-                    color="violet"
-                    size="lg"
-                  >
-                    <IconInfoCircle size={20} />
-                  </ActionIcon>
-                </Group> */}
+                  Murmur
+                </Text>
               </Group>
-            </Box>
+              <Menu shadow="md" width={200} position="bottom-end" radius="md">
+                <Menu.Target>
+                  <ActionIcon variant="subtle" color="gray" size="lg">
+                    <IconSettings size={22} />
+                  </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Label>Settings</Menu.Label>
+                  <Menu.Item
+                    leftSection={
+                      colorScheme === "dark" ? (
+                        <IconSun size={16} />
+                      ) : (
+                        <IconMoon size={16} />
+                      )
+                    }
+                    onClick={() =>
+                      setColorScheme(colorScheme === "dark" ? "light" : "dark")
+                    }
+                  >
+                    {colorScheme === "dark" ? "Light Mode" : "Dark Mode"}
+                  </Menu.Item>
 
-            <ScrollArea
-              viewportRef={viewport}
-              style={{ flex: 1 }}
-              p="xl"
-              bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))"
-            >
-              <Stack gap="md">
-                {isLoadingMessages ? (
-                  <Center h={200}>
-                    <Stack align="center" gap="sm">
-                      <Loader color="violet" size="xl" type="bars" />
-                      <Text size="sm" c="dimmed" fw={500}>
-                        Syncing your messages...
-                      </Text>
-                    </Stack>
-                  </Center>
-                ) : messages.length === 0 ? (
-                  <Center h={200}>
-                    <Text c="dimmed">Say hello! 👋</Text>
-                  </Center>
-                ) : (
-                  messages.map((msg) => {
-                    const isMe =
-                      msg.sender?._id === user?._id || msg.sender === user?._id;
-                    const senderInitials =
-                      msg.sender?.firstName && msg.sender?.lastName
-                        ? `${msg.sender.firstName.charAt(
-                            0,
-                          )}${msg.sender.lastName.charAt(0)}`.toUpperCase()
-                        : (
-                            msg.sender?.firstName?.charAt(0) || "?"
-                          ).toUpperCase();
-                    return (
-                      <Group
-                        key={msg._id}
-                        justify={isMe ? "flex-end" : "flex-start"}
-                        align="flex-end"
-                        gap="xs"
-                        wrap="nowrap"
-                      >
-                        {!isMe && (
+                  <Menu.Divider />
+
+                  <Menu.Item
+                    color="red"
+                    leftSection={<IconLogout size={16} />}
+                    onClick={() => signOut()}
+                  >
+                    Logout
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            </Group>
+
+            <Group gap="xs">
+              <TextInput
+                placeholder="Search conversations..."
+                radius="xl"
+                style={{ flex: 1 }}
+                value={sidebarSearch}
+                onChange={(e) => setSidebarSearch(e.target.value)}
+                leftSection={<IconSearch size={16} />}
+              />
+              <ActionIcon
+                variant="light"
+                color="violet"
+                radius="xl"
+                size="lg"
+                onClick={open}
+              >
+                <IconPlus size={20} />
+              </ActionIcon>
+            </Group>
+          </Box>
+
+          <ScrollArea style={{ flex: 1 }} type="scroll">
+            {isLoadingChats ? (
+              <Center mt="xl">
+                <Loader size="sm" />
+              </Center>
+            ) : filteredChats.length === 0 ? (
+              <Stack align="center" mt="xl" gap="xs" c="dimmed" px="md">
+                <IconMessages size={32} opacity={0.5} />
+                <Text size="sm" ta="center">
+                  No chats found.
+                </Text>
+              </Stack>
+            ) : (
+              <Stack gap={4} px="sm" pb="md">
+                {filteredChats.map((chat) => {
+                  const meta = getChatMetadata(chat);
+                  const isActive = activeChat?._id === chat._id;
+
+                  const myLastRead = chat.lastRead
+                    ? chat.lastRead[user?._id]
+                    : null;
+
+                  const isLastMessageFromOthers =
+                    chat.lastMessage &&
+                    chat.lastMessage.sender?._id !== user?._id;
+
+                  const isUnread =
+                    !isActive &&
+                    isLastMessageFromOthers &&
+                    (!myLastRead ||
+                      new Date(chat.lastMessage.createdAt) >
+                        new Date(myLastRead));
+
+                  return (
+                    <UnstyledButton
+                      key={chat._id}
+                      onClick={() => handleChatSelect(chat)}
+                      p="sm"
+                      style={{
+                        borderRadius: "var(--mantine-radius-lg)",
+                        backgroundColor: isActive
+                          ? "light-dark(var(--mantine-color-violet-0), var(--mantine-color-dark-5))"
+                          : "transparent",
+                      }}
+                    >
+                      <Group wrap="nowrap">
+                        <Indicator
+                          color={
+                            meta.status.toLowerCase() === "online"
+                              ? "green.5"
+                              : "gray.6"
+                          }
+                          disabled={chat.isGroup}
+                          size={16}
+                          offset={7}
+                          position="bottom-end"
+                          withBorder
+                        >
                           <Avatar
-                            src={msg.sender?.avatar}
+                            src={meta.avatar}
                             radius="xl"
-                            size="sm"
+                            size="lg"
                             color="violet"
                           >
-                            {senderInitials}
+                            {meta.initials}
                           </Avatar>
-                        )}
+                        </Indicator>
+                        <Box style={{ flex: 1, overflow: "hidden" }}>
+                          <Group justify="space-between" wrap="nowrap" gap="xs">
+                            <Group
+                              gap={6}
+                              wrap="nowrap"
+                              style={{ flex: 1, minWidth: 0 }}
+                            >
+                              <Text
+                                fw={isUnread ? 900 : 500}
+                                size="sm"
+                                truncate
+                                c={
+                                  isUnread
+                                    ? "light-dark(black, white)"
+                                    : "inherit"
+                                }
+                              >
+                                {meta.name}
+                              </Text>
+                              {meta.isDev && (
+                                <Badge
+                                  size="xs"
+                                  variant="gradient"
+                                  gradient={{
+                                    from: "indigo.6",
+                                    to: "cyan.6",
+                                    deg: 45,
+                                  }}
+                                  styles={{
+                                    label: {
+                                      fontWeight: 800,
+                                      letterSpacing: "0.5px",
+                                    },
+                                  }}
+                                  tt="uppercase"
+                                >
+                                  DEV
+                                </Badge>
+                              )}
 
-                        {isMe && (
+                              <Text
+                                size="xs"
+                                c="dimmed"
+                                style={{ whiteSpace: "nowrap" }}
+                              >
+                                {chat.lastMessage?.createdAt
+                                  ? new Date(
+                                      chat.lastMessage.createdAt,
+                                    ).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : chat.updatedAt &&
+                                    new Date(chat.updatedAt).toLocaleTimeString(
+                                      [],
+                                      {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      },
+                                    )}
+                              </Text>
+                            </Group>
+                          </Group>
                           <Text
-                            size="13px"
-                            fw={500}
-                            c="light-dark(gray.6, gray.5)"
-                            mb={4}
+                            size="xs"
+                            truncate
+                            fw={isUnread ? 700 : 400}
+                            c={isUnread ? "light-dark(black, white)" : "dimmed"}
                           >
-                            {new Date(msg.createdAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </Text>
-                        )}
-
-                        <Box
-                          maw="65%"
-                          p="8px 12px"
-                          style={{
-                            backgroundColor: isMe
-                              ? "var(--mantine-color-violet-6)"
-                              : "light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-6))",
-                            borderRadius: "14px",
-                            borderBottomRightRadius: isMe ? "4px" : "14px",
-                            borderBottomLeftRadius: isMe ? "14px" : "4px",
-                            maxWidth: "70%",
-                            border: isMe
-                              ? "none"
-                              : "1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))",
-                          }}
-                        >
-                          <Text
-                            size="md"
-                            fw={500}
-                            c={isMe ? "white" : "light-dark(black, white)"}
-                          >
-                            {msg.content}
+                            {chat.lastMessage?.content || "New conversation"}
                           </Text>
                         </Box>
+                      </Group>
+                    </UnstyledButton>
+                  );
+                })}
+              </Stack>
+            )}
+          </ScrollArea>
+        </Box>
+      )}
 
-                        {!isMe && (
-                          <Text
-                            size="13px"
-                            fw={500}
-                            c="light-dark(gray.6, gray.5)"
-                            mb={4}
+      {showChat && (
+        <Box style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          {!activeChat ? (
+            <Center
+              style={{ flex: 1, flexDirection: "column" }}
+              bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))"
+            >
+              <ThemeIcon
+                size={80}
+                radius="100%"
+                variant="light"
+                color="violet"
+                mb="md"
+              >
+                <IconMessageCircle2 size={40} />
+              </ThemeIcon>
+              <Title order={3} mb="xs">
+                Welcome to Murmur!
+              </Title>
+              <Text c="dimmed" size="sm">
+                Select a chat or start a new one to begin messaging
+              </Text>
+            </Center>
+          ) : (
+            <>
+              <Box
+                px={{ base: "md", md: "xl" }}
+                h={60}
+                style={{
+                  borderBottom:
+                    "1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <Group justify="space-between" w="100%">
+                  <Group gap="sm">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size="lg"
+                      hiddenFrom="md"
+                      onClick={handleBackToChats}
+                    >
+                      <IconArrowLeft size={22} />
+                    </ActionIcon>
+                    <Avatar
+                      src={activeChatMeta.avatar}
+                      radius="xl"
+                      size="md"
+                      color="violet"
+                    >
+                      {activeChatMeta.initials}
+                    </Avatar>
+                    <Box>
+                      <Group gap={6} align="center">
+                        <Text fw={700} size="sm">
+                          {activeChatMeta.name}
+                        </Text>
+                        {activeChatMeta.isDev && (
+                          <Badge
+                            variant="gradient"
+                            gradient={{
+                              from: "indigo.6",
+                              to: "cyan.6",
+                              deg: 45,
+                            }}
+                            size="xs"
                           >
-                            {new Date(msg.createdAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </Text>
+                            DEVELOPER
+                          </Badge>
                         )}
                       </Group>
-                    );
-                  })
-                )}
-              </Stack>
-            </ScrollArea>
+                      <Text
+                        size="xs"
+                        fw={600}
+                        c={
+                          !activeChat.isGroup &&
+                          activeChatMeta.status.toLowerCase() === "online"
+                            ? "green"
+                            : "dimmed"
+                        }
+                        style={{ textTransform: "capitalize" }}
+                      >
+                        {activeChat.isGroup
+                          ? `${activeChat.participants.length} members`
+                          : activeChatMeta.status}
+                      </Text>
+                    </Box>
+                  </Group>
+                </Group>
+              </Box>
 
-            <Box p="md" px="xl">
-              <Group gap="sm">
-                <ActionIcon variant="subtle" color="gray" size="xl">
-                  <IconPaperclip size={22} />
-                </ActionIcon>
-                <TextInput
-                  placeholder="Type a message..."
-                  style={{ flex: 1 }}
-                  radius="xl"
-                  size="md"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.currentTarget.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                />
-                <ActionIcon
-                  variant="filled"
-                  color="violet"
-                  size="xl"
-                  radius="xl"
-                  loading={isSending}
-                  onClick={handleSendMessage}
-                >
-                  <IconSend size={20} />
-                </ActionIcon>
-              </Group>
-            </Box>
-          </>
-        )}
-      </Box>
+              <ScrollArea
+                viewportRef={viewport}
+                style={{ flex: 1 }}
+                p={{ base: "md", md: "xl" }}
+                bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))"
+              >
+                <Stack gap="md">
+                  {isLoadingMessages ? (
+                    <Center h={200}>
+                      <Stack align="center" gap="sm">
+                        <Loader color="violet" size="xl" type="bars" />
+                        <Text size="sm" c="dimmed" fw={500}>
+                          Syncing your messages...
+                        </Text>
+                      </Stack>
+                    </Center>
+                  ) : messages.length === 0 ? (
+                    <Center h={200}>
+                      <Text c="dimmed">Say hello! 👋</Text>
+                    </Center>
+                  ) : (
+                    messages.map((msg) => {
+                      const isMe =
+                        msg.sender?._id === user?._id ||
+                        msg.sender === user?._id;
+                      const senderInitials =
+                        msg.sender?.firstName && msg.sender?.lastName
+                          ? `${msg.sender.firstName.charAt(
+                              0,
+                            )}${msg.sender.lastName.charAt(0)}`.toUpperCase()
+                          : (
+                              msg.sender?.firstName?.charAt(0) || "?"
+                            ).toUpperCase();
+                      return (
+                        <Group
+                          key={msg._id}
+                          justify={isMe ? "flex-end" : "flex-start"}
+                          align="flex-end"
+                          gap="xs"
+                          wrap="nowrap"
+                        >
+                          {!isMe && (
+                            <Avatar
+                              src={msg.sender?.avatar}
+                              radius="xl"
+                              size="sm"
+                              color="violet"
+                              style={{ flexShrink: 0 }}
+                            >
+                              {senderInitials}
+                            </Avatar>
+                          )}
+
+                          {isMe && (
+                            <Text
+                              size="11px"
+                              fw={500}
+                              c="light-dark(gray.6, gray.5)"
+                              mb={4}
+                              style={{ flexShrink: 0 }}
+                            >
+                              {new Date(msg.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </Text>
+                          )}
+
+                          <Box
+                            maw={{ base: "75%", md: "65%" }}
+                            p="10px 14px"
+                            style={{
+                              backgroundColor: isMe
+                                ? "var(--mantine-color-violet-6)"
+                                : "light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-6))",
+                              borderRadius: "16px",
+                              borderBottomRightRadius: isMe ? "4px" : "16px",
+                              borderBottomLeftRadius: isMe ? "16px" : "4px",
+                              border: isMe
+                                ? "none"
+                                : "1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))",
+                            }}
+                          >
+                            <Text
+                              size="sm"
+                              fw={500}
+                              c={isMe ? "white" : "light-dark(black, white)"}
+                              style={{ wordBreak: "break-word" }}
+                            >
+                              {msg.content}
+                            </Text>
+                          </Box>
+
+                          {!isMe && (
+                            <Text
+                              size="11px"
+                              fw={500}
+                              c="light-dark(gray.6, gray.5)"
+                              mb={4}
+                              style={{ flexShrink: 0 }}
+                            >
+                              {new Date(msg.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </Text>
+                          )}
+                        </Group>
+                      );
+                    })
+                  )}
+                </Stack>
+              </ScrollArea>
+
+              <Box p={{ base: "sm", md: "md" }} px={{ base: "md", md: "xl" }}>
+                <Group gap="xs">
+                  <ActionIcon variant="subtle" color="gray" size="lg">
+                    <IconPaperclip size={20} />
+                  </ActionIcon>
+                  <TextInput
+                    placeholder="Type a message..."
+                    style={{ flex: 1 }}
+                    radius="xl"
+                    size="md"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.currentTarget.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  />
+                  <ActionIcon
+                    variant="filled"
+                    color="violet"
+                    size="lg"
+                    radius="xl"
+                    loading={isSending}
+                    onClick={handleSendMessage}
+                  >
+                    <IconSend size={18} />
+                  </ActionIcon>
+                </Group>
+              </Box>
+            </>
+          )}
+        </Box>
+      )}
 
       <Modal
         opened={opened}
