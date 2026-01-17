@@ -14,6 +14,11 @@ const chatSchema = new mongoose.Schema(
       ref: "Message",
       default: null,
     },
+    lastRead: {
+      type: Map,
+      of: Date,
+      default: {},
+    },
     isGroup: {
       type: Boolean,
       default: false,
@@ -29,7 +34,7 @@ const chatSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const Chat = mongoose.model("Chat", chatSchema);

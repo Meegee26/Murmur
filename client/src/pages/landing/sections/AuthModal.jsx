@@ -112,7 +112,7 @@ export function AuthModal({ opened, close }) {
       } else {
         form.setFieldError(
           "password",
-          "An unexpected error occurred. Please refresh the page and try again."
+          "An unexpected error occurred. Please refresh the page and try again.",
         );
       }
     } finally {
@@ -255,7 +255,7 @@ export function AuthModal({ opened, close }) {
                         onBlur={(event) =>
                           form.setFieldValue(
                             "firstName",
-                            capitalize(event.currentTarget.value)
+                            capitalize(event.currentTarget.value),
                           )
                         }
                       />
@@ -267,7 +267,7 @@ export function AuthModal({ opened, close }) {
                         onBlur={(event) =>
                           form.setFieldValue(
                             "lastName",
-                            capitalize(event.currentTarget.value)
+                            capitalize(event.currentTarget.value),
                           )
                         }
                       />

@@ -1,111 +1,932 @@
 import {
-  Button,
-  Container,
-  Title,
+  Box,
   Stack,
   Group,
-  Text,
   Avatar,
-  Paper,
-  Divider,
-  Box,
-  rem,
+  Text,
+  TextInput,
+  ActionIcon,
+  ScrollArea,
+  Indicator,
+  Tooltip,
+  Image,
+  Loader,
+  Center,
+  Title,
+  ThemeIcon,
+  UnstyledButton,
+  Modal,
+  Button,
+  MultiSelect,
+  Checkbox,
+  Badge,
+  useMantineColorScheme,
+  useComputedColorScheme,
+  Menu,
 } from "@mantine/core";
-import { IconLogout, IconMessage2 } from "@tabler/icons-react";
+import { useDisclosure } from "@mantine/hooks";
+import {
+  IconSearch,
+  IconSend,
+  IconPhone,
+  IconVideo,
+  IconInfoCircle,
+  IconLogout,
+  IconPaperclip,
+  IconMessageCircle2,
+  IconMessages,
+  IconPlus,
+  IconUsers,
+  IconUserPlus,
+  IconSettings,
+  IconSun,
+  IconMoon,
+} from "@tabler/icons-react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { io } from "socket.io-client";
 import { useAuth } from "../../hooks/useAuth.js";
-import { useState } from "react";
+import { api } from "../../utils/api.js";
+import { useNavigate, useParams } from "react-router-dom";
+import { notifications } from "@mantine/notifications";
+import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
+
+const notificationSound = new Audio("/sounds/new-message.mp3");
+notificationSound.preload = "auto";
 
 export function Chat() {
   const { user, signOut } = useAuth();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { chatId } = useParams();
+  const navigate = useNavigate();
 
-  const firstName = user?.firstName || "User";
-  const lastName = user?.lastName || "";
-  const avatarUrl = user?.avatar;
+  const { setColorScheme } = useMantineColorScheme();
+  const colorScheme = useComputedColorScheme("light", {
+    getInitialValueInEffect: true,
+  });
 
-  const handleLogout = async () => {
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [opened, { open, close }] = useDisclosure(false);
+
+  const [activeChat, setActiveChat] = useState(null);
+  const [chatList, setChatList] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+
+  const [sidebarSearch, setSidebarSearch] = useState("");
+
+  const [inputValue, setInputValue] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const [isGroup, setIsGroup] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [globalUsers, setGlobalUsers] = useState([]);
+
+  const viewport = useRef(null);
+  const socket = useRef(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const socketUrl = import.meta.env.VITE_API_URL
+      ? new URL(import.meta.env.VITE_API_URL).origin
+      : "http://localhost:5500";
+
+    socket.current = io(socketUrl, {
+      query: { userId: user._id },
+    });
+
+    socket.current.on("getOnlineUsers", (users) => {
+      setOnlineUsers(users);
+    });
+
+    socket.current.on("message:new", (newMessage) => {
+      setChatList((prev) => {
+        const chatIndex = prev.findIndex((c) => c._id === newMessage.chatId);
+        if (chatIndex === -1) return prev;
+
+        const updatedChat = { ...prev[chatIndex], lastMessage: newMessage };
+        const newList = [...prev];
+        newList.splice(chatIndex, 1);
+        newList.unshift(updatedChat);
+        return newList;
+      });
+    });
+
+    socket.current.on("chat:new", (newChat) => {
+      setChatList((prev) => {
+        if (prev.find((c) => c._id === newChat._id)) return prev;
+        return [newChat, ...prev];
+      });
+    });
+
+    return () => socket.current?.disconnect();
+  }, [user]);
+
+  const handleChatSelect = useCallback(
+    async (chat) => {
+      navigate(`/chat/${chat._id}`);
+      setActiveChat(chat);
+
+      try {
+        await api.markAsRead(chat._id);
+
+        setChatList((prevList) =>
+          prevList.map((c) =>
+            c._id === chat._id
+              ? {
+                  ...c,
+                  lastRead: {
+                    ...c.lastRead,
+                    [user._id]: new Date().toISOString(),
+                  },
+                }
+              : c,
+          ),
+        );
+      } catch (err) {
+        console.error("Error marking chat as read:", err);
+      }
+    },
+    [navigate, user?._id],
+  );
+
+  useEffect(() => {
+    if (!socket.current) return;
+
+    const handleNewMessage = (newMessage) => {
+      notificationSound.play().catch((err) => {
+        console.warn("Autoplay prevented: ", err);
+      });
+
+      if (newMessage.chatId !== chatId) {
+        const targetChat = chatList.find((c) => c._id === newMessage.chatId);
+        const senderName = `${newMessage.sender?.firstName} ${newMessage.sender?.lastName}`;
+        const senderAvatar = newMessage.sender?.avatar;
+
+        notifications.show({
+          title: (
+            <Group justify="space-between" wrap="nowrap" gap="xs">
+              <Text size="sm" fw={700} truncate style={{ maxWidth: "80%" }}>
+                {targetChat?.isGroup
+                  ? `[${targetChat.groupName}] ${senderName}`
+                  : senderName}
+              </Text>
+              <Text size="xs" c="dimmed">
+                Just now
+              </Text>
+            </Group>
+          ),
+          message: (
+            <Stack gap={4} mt={5}>
+              <Text size="sm" lineClamp={2} c="gray.7">
+                {newMessage.content ||
+                  (newMessage.image ? "Sent an image" : "")}
+              </Text>
+            </Stack>
+          ),
+          icon: (
+            <Avatar src={senderAvatar} size="sm" radius="xl" color="violet">
+              {newMessage.sender?.firstName?.[0]}
+            </Avatar>
+          ),
+          color: "violet",
+          radius: "md",
+          withBorder: true,
+          onClick: () => {
+            handleChatSelect(targetChat || { _id: newMessage.chatId });
+          },
+          style: {
+            cursor: "pointer",
+            boxShadow: "var(--mantine-shadow-md)",
+          },
+
+          autoClose: 5000,
+        });
+      }
+
+      if (newMessage.chatId === chatId) {
+        setMessages((prev) => {
+          if (prev.find((m) => m._id === newMessage._id)) return prev;
+          return [...prev, newMessage];
+        });
+      }
+
+      setChatList((prev) => {
+        const chatIndex = prev.findIndex((c) => c._id === newMessage.chatId);
+        if (chatIndex === -1) return prev;
+
+        const updatedChat = { ...prev[chatIndex], lastMessage: newMessage };
+        const newList = [...prev];
+        newList.splice(chatIndex, 1);
+        newList.unshift(updatedChat);
+        return newList;
+      });
+    };
+
+    socket.current.on("message:new", handleNewMessage);
+    return () => socket.current.off("message:new", handleNewMessage);
+  }, [chatId, chatList, handleChatSelect]);
+
+  useEffect(() => {
+    if (chatId && chatList.length > 0) {
+      const found = chatList.find((c) => c._id === chatId);
+      if (found) {
+        setActiveChat(found);
+      }
+    } else if (!chatId) {
+      setActiveChat(null);
+    }
+  }, [chatId, chatList]);
+
+  useEffect(() => {
+    const fetchChats = async () => {
+      try {
+        const data = await api.getUserChats();
+        setChatList(data.chats || []);
+      } catch (error) {
+        console.error("Failed to load chats", error);
+      } finally {
+        setIsLoadingChats(false);
+      }
+    };
+    if (user) fetchChats();
+  }, [user]);
+
+  useEffect(() => {
+    if (!activeChat) return;
+    const fetchMessages = async () => {
+      setIsLoadingMessages(true);
+
+      try {
+        const data = await api.getChatDetails(activeChat._id);
+        setMessages(data.messages || []);
+      } catch (error) {
+        console.error("Failed to load messages", error);
+        setMessages([]);
+      } finally {
+        setIsLoadingMessages(false);
+      }
+    };
+
+    fetchMessages();
+  }, [activeChat]);
+
+  useEffect(() => {
+    viewport.current?.scrollTo({
+      top: viewport.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
+
+  const getChatMetadata = useCallback(
+    (chat) => {
+      if (!chat || !user)
+        return {
+          name: "Loading...",
+          avatar: null,
+          status: "offline",
+          initials: "?",
+          isDev: false,
+        };
+
+      if (chat.isGroup) {
+        return {
+          name: chat.groupName || "Group Chat",
+          avatar: null,
+          status: "group",
+          initials: (chat.groupName || "G").charAt(0).toUpperCase(),
+          isDev: false,
+        };
+      }
+
+      const other = chat.participants.find((p) => p._id !== user._id);
+      const isOnline = onlineUsers.includes(other?._id);
+
+      return {
+        name: other ? `${other.firstName} ${other.lastName}` : "Unknown User",
+        avatar: other?.avatar || null,
+        status: isOnline ? "Online" : "Offline",
+        initials: other
+          ? `${other.firstName.charAt(0)}${other.lastName.charAt(
+              0,
+            )}`.toUpperCase()
+          : "?",
+        isDev: other?.isDev || false,
+      };
+    },
+    [user, onlineUsers],
+  );
+
+  const filteredChats = useMemo(() => {
+    return chatList.filter((chat) => {
+      const meta = getChatMetadata(chat);
+      return meta.name.toLowerCase().includes(sidebarSearch.toLowerCase());
+    });
+  }, [chatList, sidebarSearch, getChatMetadata]);
+
+  const handleGlobalSearch = async (query) => {
+    if (query.length < 2) return;
     try {
-      setIsLoggingOut(true);
-      await signOut();
-    } catch (error) {
-      console.error("Logout failed", error);
-    } finally {
-      setIsLoggingOut(false);
+      const res = await api.searchUsers(query);
+      const formatted = res.data.map((u) => ({
+        value: u._id,
+        label: `${u.firstName} ${u.lastName} (${u.email})`,
+      }));
+      setGlobalUsers(formatted);
+    } catch (err) {
+      console.error("Global search error", err);
     }
   };
 
+  const handleCreateChat = async () => {
+    try {
+      let payload;
+      if (isGroup) {
+        payload = { isGroup: true, groupName, participants: selectedUsers };
+      } else {
+        payload = { participantId: selectedUsers[0] };
+      }
+
+      const res = await api.createChat(payload);
+      const chatData = res.chat;
+
+      if (!chatList.find((c) => c._id === chatData._id)) {
+        setChatList([chatData, ...chatList]);
+      }
+
+      setActiveChat(chatData);
+      close();
+      setIsGroup(false);
+      setGroupName("");
+      setSelectedUsers([]);
+    } catch (err) {
+      console.error("Failed to create chat", err);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || !activeChat) return;
+    const temp = inputValue;
+    setInputValue("");
+    setIsSending(true);
+
+    try {
+      const res = await api.sendMessage({
+        chatId: activeChat._id,
+        content: temp,
+      });
+
+      const newMessage = res.newMessage;
+
+      setMessages((prev) => [...prev, newMessage]);
+
+      setChatList((prev) => {
+        const chatIndex = prev.findIndex((c) => c._id === newMessage.chatId);
+        if (chatIndex === -1) return prev;
+
+        const updatedChat = { ...prev[chatIndex], lastMessage: newMessage };
+        const newList = [...prev];
+        newList.splice(chatIndex, 1);
+        newList.unshift(updatedChat);
+        return newList;
+      });
+    } catch {
+      setInputValue(temp);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const activeChatMeta = useMemo(
+    () => getChatMetadata(activeChat),
+    [activeChat, getChatMetadata],
+  );
+
   return (
-    <Container size="md" py="xl">
-      <Paper shadow="md" p="xl" radius="lg" withBorder>
-        <Stack gap="xl">
-          <Group justify="space-between" align="flex-start">
-            <Group gap="lg">
-              <Avatar
-                src={avatarUrl}
-                size={70}
-                radius="xl"
-                color="violet"
-                variant="light"
-                style={{
-                  border: "2px solid var(--mantine-color-violet-light)",
-                }}
-              >
-                {firstName[0]}
-                {lastName[0]}
-              </Avatar>
-
-              <Stack gap={0}>
-                <Title order={2} fw={800} lts={-0.5}>
-                  {firstName} {lastName}
-                </Title>
-                <Text size="sm" c="dimmed" fw={500}>
-                  {user?.email}
-                </Text>
-              </Stack>
-            </Group>
-
-            <Button
-              color="red"
-              variant="subtle"
-              leftSection={<IconLogout size={16} />}
-              onClick={handleLogout}
-              loading={isLoggingOut}
-              radius="md"
+    <Box
+      h="100vh"
+      w="100vw"
+      style={{ display: "flex", overflow: "hidden", position: "fixed" }}
+    >
+      <Box
+        w={{ base: 80, md: 360 }}
+        style={{
+          borderRight:
+            "1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))",
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor:
+            "light-dark(var(--mantine-color-white), var(--mantine-color-dark-7))",
+        }}
+      >
+        <Box px="md" pt="md" pb="xs">
+          <Group justify="space-between" mb="lg">
+            <Text
+              fw={900}
+              size="xl"
+              variant="gradient"
+              gradient={{ from: "indigo.6", to: "violet.6" }}
+              visibleFrom="md"
             >
-              Logout
-            </Button>
+              Chats
+            </Text>
+            <Menu shadow="md" width={200} position="bottom-end" radius="md">
+              <Menu.Target>
+                <ActionIcon variant="subtle" color="gray" size="lg">
+                  <IconSettings size={22} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Settings</Menu.Label>
+                <Menu.Item
+                  leftSection={
+                    colorScheme === "dark" ? (
+                      <IconSun size={16} />
+                    ) : (
+                      <IconMoon size={16} />
+                    )
+                  }
+                  onClick={() =>
+                    setColorScheme(colorScheme === "dark" ? "light" : "dark")
+                  }
+                >
+                  {colorScheme === "dark" ? "Light Mode" : "Dark Mode"}
+                </Menu.Item>
+
+                <Menu.Divider />
+
+                <Menu.Item
+                  color="red"
+                  leftSection={<IconLogout size={16} />}
+                  onClick={() => signOut()}
+                >
+                  Logout
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
 
-          <Divider
-            label={
-              <Group gap="xs">
-                <IconMessage2 size={16} />
-                <Text size="xs" fw={700}>
-                  MESSAGES
-                </Text>
-              </Group>
-            }
-            labelPosition="left"
-          />
+          <Group gap="xs" visibleFrom="md">
+            <TextInput
+              placeholder="Search conversations..."
+              radius="xl"
+              style={{ flex: 1 }}
+              visibleFrom="md"
+              value={sidebarSearch}
+              onChange={(e) => setSidebarSearch(e.target.value)}
+              leftSection={<IconSearch size={16} />}
+            />
+            <ActionIcon
+              variant="light"
+              color="violet"
+              radius="xl"
+              size="lg"
+              onClick={open}
+            >
+              <IconPlus size={20} />
+            </ActionIcon>
+          </Group>
+        </Box>
 
-          <Box
-            mih={400}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              alignItems: "center",
-              backgroundColor: "rgba(0,0,0,0.02)",
-              borderRadius: rem(8),
-              border: "1px dashed var(--mantine-color-gray-3)",
-            }}
+        <ScrollArea style={{ flex: 1 }} type="scroll">
+          {isLoadingChats ? (
+            <Center mt="xl">
+              <Loader size="sm" />
+            </Center>
+          ) : filteredChats.length === 0 ? (
+            <Stack align="center" mt="xl" gap="xs" c="dimmed" px="md">
+              <IconMessages size={32} opacity={0.5} />
+              <Text size="sm" ta="center">
+                No chats found.
+              </Text>
+            </Stack>
+          ) : (
+            <Stack gap={4} px="sm" pb="md">
+              {filteredChats.map((chat) => {
+                const meta = getChatMetadata(chat);
+                const isActive = activeChat?._id === chat._id;
+
+                const myLastRead = chat.lastRead
+                  ? chat.lastRead[user?._id]
+                  : null;
+
+                const isLastMessageFromOthers =
+                  chat.lastMessage &&
+                  chat.lastMessage.sender?._id !== user?._id;
+
+                const isUnread =
+                  !isActive &&
+                  isLastMessageFromOthers &&
+                  (!myLastRead ||
+                    new Date(chat.lastMessage.createdAt) >
+                      new Date(myLastRead));
+
+                return (
+                  <UnstyledButton
+                    key={chat._id}
+                    onClick={() => handleChatSelect(chat)}
+                    p="sm"
+                    style={{
+                      borderRadius: "var(--mantine-radius-lg)",
+                      backgroundColor: isActive
+                        ? "light-dark(var(--mantine-color-violet-0), var(--mantine-color-dark-5))"
+                        : "transparent",
+                    }}
+                  >
+                    <Group wrap="nowrap">
+                      <Indicator
+                        color={
+                          meta.status.toLowerCase() === "online"
+                            ? "green.5"
+                            : "gray.6"
+                        }
+                        disabled={chat.isGroup}
+                        size={16}
+                        offset={7}
+                        position="bottom-end"
+                        withBorder
+                      >
+                        <Avatar
+                          src={meta.avatar}
+                          radius="xl"
+                          size="lg"
+                          color="violet"
+                        >
+                          {meta.initials}
+                        </Avatar>
+                      </Indicator>
+                      <Box
+                        style={{ flex: 1, overflow: "hidden" }}
+                        visibleFrom="md"
+                      >
+                        <Group justify="space-between" wrap="nowrap" gap="xs">
+                          <Group
+                            gap={6}
+                            wrap="nowrap"
+                            style={{ flex: 1, minWidth: 0 }}
+                          >
+                            <Text
+                              fw={isUnread ? 900 : 500}
+                              size="sm"
+                              truncate
+                              c={
+                                isUnread
+                                  ? "light-dark(black, white)"
+                                  : "inherit"
+                              }
+                            >
+                              {meta.name}
+                            </Text>
+                            {meta.isDev && (
+                              <Badge
+                                size="xs"
+                                variant="gradient"
+                                gradient={{
+                                  from: "indigo.6",
+                                  to: "cyan.6",
+                                  deg: 45,
+                                }}
+                                styles={{
+                                  label: {
+                                    fontWeight: 800,
+                                    letterSpacing: "0.5px",
+                                  },
+                                }}
+                                tt="uppercase"
+                              >
+                                DEV
+                              </Badge>
+                            )}
+
+                            <Text
+                              size="xs"
+                              c="dimmed"
+                              style={{ whiteSpace: "nowrap" }}
+                            >
+                              {chat.lastMessage?.createdAt
+                                ? new Date(
+                                    chat.lastMessage.createdAt,
+                                  ).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : chat.updatedAt &&
+                                  new Date(chat.updatedAt).toLocaleTimeString(
+                                    [],
+                                    { hour: "2-digit", minute: "2-digit" },
+                                  )}
+                            </Text>
+                          </Group>
+                        </Group>
+                        <Text
+                          size="xs"
+                          truncate
+                          fw={isUnread ? 700 : 400}
+                          c={isUnread ? "light-dark(black, white)" : "dimmed"}
+                        >
+                          {chat.lastMessage?.content || "New conversation"}
+                        </Text>
+                      </Box>
+                    </Group>
+                  </UnstyledButton>
+                );
+              })}
+            </Stack>
+          )}
+        </ScrollArea>
+      </Box>
+
+      <Box style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {!activeChat ? (
+          <Center
+            style={{ flex: 1, flexDirection: "column" }}
+            bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))"
           >
-            <Text c="dimmed" italic size="sm">
-              Your conversations will appear here soon.
+            <ThemeIcon
+              size={80}
+              radius="100%"
+              variant="light"
+              color="violet"
+              mb="md"
+            >
+              <IconMessageCircle2 size={40} />
+            </ThemeIcon>
+            <Title order={3} mb="xs">
+              Welcome to Chat
+            </Title>
+            <Text c="dimmed" size="sm">
+              Select a chat or start a new one to begin messaging
             </Text>
-          </Box>
+          </Center>
+        ) : (
+          <>
+            <Box
+              px="xl"
+              h={80}
+              style={{
+                borderBottom: "1px solid var(--mantine-color-gray-2)",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <Group justify="space-between" w="100%">
+                <Group>
+                  <Avatar
+                    src={activeChatMeta.avatar}
+                    radius="xl"
+                    color="violet"
+                  >
+                    {activeChatMeta.initials}
+                  </Avatar>
+                  <Box>
+                    <Group gap={10} align="center">
+                      <Text fw={800} size="md">
+                        {activeChatMeta.name}
+                      </Text>
+                      {activeChatMeta.isDev && (
+                        <Badge
+                          variant="gradient"
+                          gradient={{ from: "indigo.6", to: "cyan.6", deg: 45 }}
+                          size="xs"
+                        >
+                          DEVELOPER
+                        </Badge>
+                      )}
+                    </Group>
+                    <Text
+                      size="xs"
+                      fw={700}
+                      c={
+                        !activeChat.isGroup &&
+                        activeChatMeta.status.toLowerCase() === "online"
+                          ? "green"
+                          : "dimmed"
+                      }
+                      style={{ textTransform: "capitalize" }}
+                    >
+                      {activeChat.isGroup
+                        ? `${activeChat.participants.length} members`
+                        : activeChatMeta.status}
+                    </Text>
+                  </Box>
+                </Group>
+                {/* <Group gap="sm">
+                  <ActionIcon
+                    variant="light"
+                    radius="xl"
+                    color="gray"
+                    size="lg"
+                  >
+                    <IconPhone size={20} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    radius="xl"
+                    color="gray"
+                    size="lg"
+                  >
+                    <IconVideo size={20} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    radius="xl"
+                    color="violet"
+                    size="lg"
+                  >
+                    <IconInfoCircle size={20} />
+                  </ActionIcon>
+                </Group> */}
+              </Group>
+            </Box>
+
+            <ScrollArea
+              viewportRef={viewport}
+              style={{ flex: 1 }}
+              p="xl"
+              bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))"
+            >
+              <Stack gap="md">
+                {isLoadingMessages ? (
+                  <Center h={200}>
+                    <Stack align="center" gap="sm">
+                      <Loader color="violet" size="xl" type="bars" />
+                      <Text size="sm" c="dimmed" fw={500}>
+                        Syncing your messages...
+                      </Text>
+                    </Stack>
+                  </Center>
+                ) : messages.length === 0 ? (
+                  <Center h={200}>
+                    <Text c="dimmed">Say hello! 👋</Text>
+                  </Center>
+                ) : (
+                  messages.map((msg) => {
+                    const isMe =
+                      msg.sender?._id === user?._id || msg.sender === user?._id;
+                    const senderInitials =
+                      msg.sender?.firstName && msg.sender?.lastName
+                        ? `${msg.sender.firstName.charAt(
+                            0,
+                          )}${msg.sender.lastName.charAt(0)}`.toUpperCase()
+                        : (
+                            msg.sender?.firstName?.charAt(0) || "?"
+                          ).toUpperCase();
+                    return (
+                      <Group
+                        key={msg._id}
+                        justify={isMe ? "flex-end" : "flex-start"}
+                        align="flex-end"
+                        gap="xs"
+                        wrap="nowrap"
+                      >
+                        {!isMe && (
+                          <Avatar
+                            src={msg.sender?.avatar}
+                            radius="xl"
+                            size="sm"
+                            color="violet"
+                          >
+                            {senderInitials}
+                          </Avatar>
+                        )}
+
+                        {isMe && (
+                          <Text
+                            size="13px"
+                            fw={500}
+                            c="light-dark(gray.6, gray.5)"
+                            mb={4}
+                          >
+                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </Text>
+                        )}
+
+                        <Box
+                          maw="65%"
+                          p="8px 12px"
+                          style={{
+                            backgroundColor: isMe
+                              ? "var(--mantine-color-violet-6)"
+                              : "light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-6))",
+                            borderRadius: "14px",
+                            borderBottomRightRadius: isMe ? "4px" : "14px",
+                            borderBottomLeftRadius: isMe ? "14px" : "4px",
+                            maxWidth: "70%",
+                            border: isMe
+                              ? "none"
+                              : "1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))",
+                          }}
+                        >
+                          <Text
+                            size="md"
+                            fw={500}
+                            c={isMe ? "white" : "light-dark(black, white)"}
+                          >
+                            {msg.content}
+                          </Text>
+                        </Box>
+
+                        {!isMe && (
+                          <Text
+                            size="13px"
+                            fw={500}
+                            c="light-dark(gray.6, gray.5)"
+                            mb={4}
+                          >
+                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </Text>
+                        )}
+                      </Group>
+                    );
+                  })
+                )}
+              </Stack>
+            </ScrollArea>
+
+            <Box p="md" px="xl">
+              <Group gap="sm">
+                <ActionIcon variant="subtle" color="gray" size="xl">
+                  <IconPaperclip size={22} />
+                </ActionIcon>
+                <TextInput
+                  placeholder="Type a message..."
+                  style={{ flex: 1 }}
+                  radius="xl"
+                  size="md"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.currentTarget.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                />
+                <ActionIcon
+                  variant="filled"
+                  color="violet"
+                  size="xl"
+                  radius="xl"
+                  loading={isSending}
+                  onClick={handleSendMessage}
+                >
+                  <IconSend size={20} />
+                </ActionIcon>
+              </Group>
+            </Box>
+          </>
+        )}
+      </Box>
+
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={<Text fw={700}>New Conversation</Text>}
+        centered
+        radius="lg"
+      >
+        <Stack>
+          <Checkbox
+            label="Group Chat"
+            checked={isGroup}
+            onChange={(e) => setIsGroup(e.currentTarget.checked)}
+          />
+          {isGroup && (
+            <TextInput
+              label="Group Name"
+              placeholder="Team Alpha"
+              required
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+            />
+          )}
+          <MultiSelect
+            label={isGroup ? "Select Members" : "Select User"}
+            placeholder="Search by name..."
+            data={globalUsers}
+            searchable
+            onSearchChange={handleGlobalSearch}
+            value={selectedUsers}
+            onChange={setSelectedUsers}
+            maxValues={isGroup ? undefined : 1}
+            leftSection={
+              isGroup ? <IconUsers size={16} /> : <IconUserPlus size={16} />
+            }
+          />
+          <Button
+            fullWidth
+            color="violet"
+            radius="xl"
+            disabled={selectedUsers.length === 0 || (isGroup && !groupName)}
+            onClick={handleCreateChat}
+          >
+            Start {isGroup ? "Group" : "Chat"}
+          </Button>
         </Stack>
-      </Paper>
-    </Container>
+      </Modal>
+    </Box>
   );
 }

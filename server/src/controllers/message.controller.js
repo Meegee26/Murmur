@@ -1,6 +1,7 @@
 import Chat from "../models/chat.model.js";
 import Message from "../models/message.model.js";
 import cloudinary from "../config/cloudinary.js";
+import { emitNewMessageToChat } from "../lib/socket.js";
 
 export const sendMessage = async (req, res, next) => {
   try {
@@ -11,26 +12,9 @@ export const sendMessage = async (req, res, next) => {
       _id: chatId,
       participants: { $in: [userId] },
     });
-    if (!chat) {
-      const error = new Error("Chat not found");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    if (replyToId) {
-      const replyMessage = await Message.findOne({
-        _id: replyToId,
-        chatId,
-      });
-      if (!replyMessage) {
-        const error = new Error("Message not found");
-        error.statusCode = 404;
-        throw error;
-      }
-    }
+    if (!chat) return res.status(404).json({ message: "Chat not found" });
 
     let imageUrl;
-
     if (image) {
       const uploadRes = await cloudinary.uploader.upload(image);
       imageUrl = uploadRes.secure_url;
@@ -45,25 +29,22 @@ export const sendMessage = async (req, res, next) => {
     });
 
     await newMessage.populate([
-      { path: "sender", select: "name avatar" },
+      { path: "sender", select: "firstName lastName avatar" },
       {
         path: "replyTo",
         select: "content image sender",
-        populate: {
-          path: "sender",
-          select: "name avatar",
-        },
+        populate: { path: "sender", select: "firstName lastName avatar" },
       },
     ]);
 
     chat.lastMessage = newMessage._id;
     await chat.save();
 
-    res.status(200).json({
-      success: true,
+    emitNewMessageToChat(chat.participants, newMessage, userId);
+
+    res.status(201).json({
       message: "Message sent successfully",
-      userMessage: newMessage,
-      chat,
+      newMessage,
     });
   } catch (error) {
     next(error);

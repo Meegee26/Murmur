@@ -18,7 +18,7 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 export const api = {
@@ -63,6 +63,36 @@ export const api = {
       throw new Error("No token found");
     }
     const response = await apiClient.get("/auth/check-auth");
+    return response.data;
+  },
+
+  searchUsers: async (query) => {
+    const response = await apiClient.get(`/users?search=${query}`);
+    return response.data;
+  },
+
+  getUserChats: async () => {
+    const response = await apiClient.get("/chats/all");
+    return response.data;
+  },
+
+  getChatDetails: async (chatId) => {
+    const response = await apiClient.get(`/chats/${chatId}`);
+    return response.data;
+  },
+
+  createChat: async (data) => {
+    const response = await apiClient.post("/chats/create", data);
+    return response.data;
+  },
+
+  sendMessage: async (data) => {
+    const response = await apiClient.post("/chats/message/send", data);
+    return response.data;
+  },
+
+  markAsRead: async (chatId) => {
+    const response = await apiClient.patch(`/chats/${chatId}/read`);
     return response.data;
   },
 };

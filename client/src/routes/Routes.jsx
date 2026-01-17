@@ -54,7 +54,7 @@ export const AppRoutes = () => {
       />
 
       <Route
-        path="/chat"
+        path="/chat/:chatId?"
         element={
           <ProtectedRoute>
             <Chat />

@@ -1,7 +1,7 @@
 import { Container, Group, Text, rem, Box, Image } from "@mantine/core";
 import { useWindowScroll } from "@mantine/hooks";
 import { ColorSchemeToggle } from "../../components/ColorSchemeToggle.jsx";
-import logoIcon from "/icon.png";
+import logoIcon from "/images/icon.png";
 
 export function Header() {
   const [scroll] = useWindowScroll();
@@ -28,7 +28,7 @@ export function Header() {
         borderBottom:
           scroll.y > 0
             ? `${rem(
-                1
+                1,
               )} solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))`
             : "1px solid transparent",
       }}
