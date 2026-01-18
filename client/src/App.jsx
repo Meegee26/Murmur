@@ -15,10 +15,11 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function AppContent() {
   const [serverStatus, setServerStatus] = useState("checking");
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     const checkServer = async () => {
-      const isHealthy = await checkServerHealth();
+      const isHealthy = await checkServerHealth(10000);
 
       if (isHealthy) {
         setServerStatus("ready");
@@ -38,21 +39,18 @@ function AppContent() {
   }, []);
 
   const handleRetry = async () => {
-    const isHealthy = await checkServerHealth();
+    if (isRetrying) return;
 
-    if (isHealthy) {
-      setServerStatus("ready");
-    } else {
-      if (serverStatus === "error") {
-        setServerStatus("waking");
-        const wokenUp = await waitForServerWakeup();
-        setServerStatus(wokenUp ? "ready" : "error");
-      }
-    }
+    setIsRetrying(true);
+    setServerStatus("waking");
+
+    const wokenUp = await waitForServerWakeup();
+    setServerStatus(wokenUp ? "ready" : "error");
+    setIsRetrying(false);
   };
 
   if (serverStatus === "checking" || serverStatus === "waking") {
-    return <ServerWaking onRetry={handleRetry} />;
+    return <ServerWaking onRetry={handleRetry} disabled={isRetrying} />;
   }
 
   if (serverStatus === "error") {

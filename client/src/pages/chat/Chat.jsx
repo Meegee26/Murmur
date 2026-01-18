@@ -416,9 +416,17 @@ export function Chat() {
 
   return (
     <Box
-      h="100vh"
+      h="100dvh"
       w="100vw"
-      style={{ display: "flex", overflow: "hidden", position: "fixed" }}
+      style={{
+        display: "flex",
+        overflow: "hidden",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}
     >
       {showSidebar && (
         <Box
@@ -430,6 +438,7 @@ export function Chat() {
             flexDirection: "column",
             backgroundColor:
               "light-dark(var(--mantine-color-white), var(--mantine-color-dark-7))",
+            height: "100%",
           }}
         >
           <Box px="md" pt="md" pb="xs">
@@ -658,7 +667,16 @@ export function Chat() {
       )}
 
       {showChat && (
-        <Box style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <Box
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+            height: "100%",
+            position: "relative",
+          }}
+        >
           {!activeChat ? (
             <Center
               style={{ flex: 1, flexDirection: "column" }}
@@ -690,6 +708,8 @@ export function Chat() {
                     "1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))",
                   display: "flex",
                   alignItems: "center",
+                  flexShrink: 0,
+                  zIndex: 10,
                 }}
               >
                 <Group justify="space-between" w="100%">
@@ -752,12 +772,16 @@ export function Chat() {
 
               <ScrollArea
                 viewportRef={viewport}
-                style={{ flex: 1 }}
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                }}
                 p={{ base: "md", md: "xl" }}
+                pb={{ base: 80, md: "xl" }}
                 bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))"
               >
                 <Stack gap="md">
-                  {isLoadingMessages ? (
+                  {isLoadingMessages && messages.length === 0 ? (
                     <Center h={200}>
                       <Stack align="center" gap="sm">
                         <Loader color="violet" size="xl" type="bars" />
@@ -864,8 +888,22 @@ export function Chat() {
                 </Stack>
               </ScrollArea>
 
-              <Box p={{ base: "sm", md: "md" }} px={{ base: "md", md: "xl" }}>
-                <Group gap="xs">
+              <Box
+                p={{ base: "sm", md: "md" }}
+                px={{ base: "md", md: "xl" }}
+                style={{
+                  flexShrink: 0,
+                  backgroundColor:
+                    "light-dark(var(--mantine-color-white), var(--mantine-color-dark-7))",
+                  borderTop:
+                    "1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))",
+                  zIndex: 100,
+                  position: "sticky",
+                  bottom: 0,
+                  width: "100%",
+                }}
+              >
+                <Group gap="xs" wrap="nowrap">
                   <ActionIcon variant="subtle" color="gray" size="lg">
                     <IconPaperclip size={20} />
                   </ActionIcon>

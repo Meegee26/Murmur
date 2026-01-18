@@ -10,7 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import { IconClock, IconInfoCircle } from "@tabler/icons-react";
 
-export function ServerWaking({ onRetry, onCancel }) {
+export function ServerWaking({ onRetry, onCancel, disabled }) {
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("Waking up the server...");
 
@@ -18,13 +18,13 @@ export function ServerWaking({ onRetry, onCancel }) {
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 95) return 95;
-        return prev + 5;
+        return prev + 3;
       });
-    }, 500);
+    }, 1000);
 
     const messageTimeout = setTimeout(() => {
-      setMessage("This may take up to a minute on first load...");
-    }, 10000);
+      setMessage("This may take up to 90 seconds on first load...");
+    }, 15000);
 
     return () => {
       clearInterval(interval);
@@ -79,8 +79,15 @@ export function ServerWaking({ onRetry, onCancel }) {
           </Alert>
 
           <Stack gap="xs" style={{ width: "100%" }}>
-            <Button onClick={onRetry} variant="light" color="violet" fullWidth>
-              Check Now
+            <Button
+              onClick={onRetry}
+              variant="light"
+              color="violet"
+              fullWidth
+              disabled={disabled}
+              loading={disabled}
+            >
+              {disabled ? "Checking..." : "Check Now"}
             </Button>
             {onCancel && (
               <Button
@@ -88,6 +95,7 @@ export function ServerWaking({ onRetry, onCancel }) {
                 variant="subtle"
                 color="gray"
                 size="sm"
+                disabled={disabled}
               >
                 Cancel
               </Button>
